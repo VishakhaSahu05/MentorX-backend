@@ -1,0 +1,6 @@
+- Created Repository
+- Intialized the Repository
+- Installed express
+- Created a server
+- Listen to post 3000
+- Installed nodemon 

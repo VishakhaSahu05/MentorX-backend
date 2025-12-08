@@ -1,0 +1,28 @@
+{
+  "name": "mentorx-backend",
+  "version": "1.0.0",
+  "description": "Website for Students",
+  "main": "index.js",
+  "scripts": {
+    "start" : "node src/app.js",
+    "dev": "nodemon src/app.js"
+
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VishakhaSahu05/MentorX-backend.git"
+  },
+  "keywords": [
+    "nodejs",
+    "javascript"
+  ],
+  "author": "\"Vishakha Sahu\"",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/VishakhaSahu05/MentorX-backend/issues"
+  },
+  "homepage": "https://github.com/VishakhaSahu05/MentorX-backend#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
