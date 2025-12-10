@@ -4,3 +4,9 @@
 - Created a server
 - Listen to post 3000
 - Installed nodemon 
+- Installed Mongoose library
+- Connected Application to the Database /MentorX
+- Installed dotenv
+- Created a userSchema and userModel
+- 
+
