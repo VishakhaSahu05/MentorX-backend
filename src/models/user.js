@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const validator = require("validator");
-
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const userSchema = mongoose.Schema(
   {
@@ -29,11 +30,13 @@ const userSchema = mongoose.Schema(
     password: {
       type: String,
       required: true,
-      validate(value){
-        if(!validator.isStrongPassword(value)){
-            throw new Error("Enter a Strong Password: " + value)
+      validate(value) {
+        if (this.isModified("password")) {   // ✔ important fix
+          if (!validator.isStrongPassword(value)) {
+            throw new Error("Enter a Strong Password: " + value);
+          }
         }
-      }
+      },
     },
 
     gender: {
@@ -92,5 +95,23 @@ const userSchema = mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Index fix
+userSchema.index({ firstName: 1, lastName: 1 });
+
+// JWT function
+userSchema.methods.getJWT = async function () {
+  const user = this;
+  return jwt.sign(
+    { _id: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+};
+
+// Password validation
+userSchema.methods.validatePassword = async function (passwordInputByUser) {
+  return await bcrypt.compare(passwordInputByUser, this.password);
+};
 
 module.exports = mongoose.model("User", userSchema);

@@ -5,8 +5,14 @@ const app = express();
 const User = require("./models/user");
 const { validateSignUpData } = require("./utils/validation");
 const bcrypt = require("bcrypt");
+const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
+const {userAuth} = require("./middleware/auth");
+
 
 app.use(express.json());
+app.use(cookieParser());
+
 app.post("/signup", async (req, res) => {
   //validation of data
   try {
@@ -33,120 +39,39 @@ app.post("/signup", async (req, res) => {
 app.post("/login", async (req, res) => {
   try {
     const { emailId, password } = req.body;
-    const user = await User.findOne({emailId : emailId});
-    if(!user){
-        throw new Error("Invalid Credentials");
-    }
-    const isPasswordValid = await bcrypt.compare(password , user.password);
-    if(isPasswordValid){
-        res.send("Login Successfull");
-    }else{
-        throw new Error("Invalid Credentials");
-    }
+
+    const user = await User.findOne({ emailId });
+    if (!user) throw new Error("Invalid Credentials");
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) throw new Error("Invalid Credentials");
+
+    // Create JWT token from schema method
+    const token = await user.getJWT();
+
+    // Send cookie
+    res.cookie("token", token, {
+      expires: new Date(Date.now() + 8 * 3600000), 
+      httpOnly: true,
+      sameSite: "strict"
+    });
+
+    res.send("Login Successful");
   } catch (err) {
     res.status(500).send("ERROR: " + err.message);
   }
 });
 
-//feed API get all the user from the database
-app.get("/feed", async (req, res) => {
-  try {
-    const userId = req.query.userId; // ID of logged-in user
-
-    //  Find the logged-in user
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (user.role === "student") {
-      const mentors = await User.find({
-        role: "mentor",
-        department: user.department,
-      }).select("-password");
-
-      return res.json({
-        feedFor: "student",
-        department: user.department,
-        mentors,
-      });
-    }
-    if (user.role === "mentor") {
-      const students = await User.find({
-        role: "student",
-        department: user.department,
-      }).select("-password");
-
-      return res.json({
-        feedFor: "mentor",
-        department: user.department,
-        students,
-      });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+ 
+app.get("/profile", userAuth , async (req , res)=>{
+  try{
+    const user = req.user;
+    res.send(user);
+  }catch(err){
+    res.status(400).send("ERROR : " + err.message);
   }
 });
-app.delete("/user", async (req, res) => {
-  const userId = req.body.userId;
-  try {
-    const user = await User.findByIdAndDelete(userId);
-    res.send("User Deleted Successfully");
-  } catch (err) {
-    res.status(400).send("Something went Wrong");
-  }
-});
-//update data of the user
-app.patch("/user/:userId", async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const updates = req.body;
 
-    const ALLOWED_UPDATES = ["profilePic", "gender", "age", "skills", "about"];
-
-    // Allow only certain fields
-    const isValid = Object.keys(updates).every((key) =>
-      ALLOWED_UPDATES.includes(key)
-    );
-    if (!isValid) {
-      return res.status(400).json({ error: "Update not allowed" });
-    }
-
-    // gender check
-    if (updates.gender) {
-      const allowed = ["male", "female", "other"];
-      if (!allowed.includes(updates.gender)) {
-        return res.status(400).json({ error: "Invalid gender" });
-      }
-    }
-
-    //age check
-    if (updates.age && updates.age < 18) {
-      return res.status(400).json({ error: "Age must be 18 or above" });
-    }
-
-    //skills check
-    if (updates.skills) {
-      if (!Array.isArray(updates.skills)) {
-        return res.status(400).json({ error: "Skills must be an array" });
-      }
-
-      if (updates.skills.length > 10) {
-        return res.status(400).json({ error: "Max 10 skills allowed" });
-      }
-    }
-
-    // Update user
-    const user = await User.findByIdAndUpdate(userId, updates, { new: true });
-
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    res.json({ message: "User updated", user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 connectDB()
   .then(() => {
