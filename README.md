@@ -41,6 +41,9 @@
 - Created PATCH/profile/password //forgot password API
 
 
+- Created Connection request Schema
+- Created Connection Request API
+- proper validation and testing completed
 
 
 
