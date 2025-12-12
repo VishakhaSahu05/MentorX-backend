@@ -36,6 +36,11 @@
 - Refactored code using express routers
 
 
+- Created POST/logout API
+- Created PATCH/profile/edit
+- Created PATCH/profile/password //forgot password API
+
+
 
 
 
