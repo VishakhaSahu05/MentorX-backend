@@ -45,5 +45,8 @@
 - Created Connection Request API
 - proper validation and testing completed
 - created request/review/accpeted,rejected API
+- created GET user/requests/recieved //for mentor
+- created GET user/connection //for both mentor and student
+
 
 
