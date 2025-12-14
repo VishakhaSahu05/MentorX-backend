@@ -2,6 +2,7 @@ const express = require("express");
 const { userAuth } = require("../middleware/auth");
 const requestRouter = express.Router();
 const User = require("../models/user");
+const Block = require("../models/block");
 const ConnectionRequestModel = require("../models/connectionRequest");
 
 requestRouter.post(
@@ -18,25 +19,36 @@ requestRouter.post(
         return res.status(400).json({ message: "Invalid status type" });
       }
 
-      // Check if receiver exists
-      const toUser = await User.findById(toUserId);
-      if (!toUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
       // Only students can send
       if (req.user.role !== "student") {
-        return res.status(400).json({ message: "Only students can send requests" });
+        return res
+          .status(400)
+          .json({ message: "Only students can send requests" });
       }
 
       // Prevent self request
       if (fromUserId.equals(toUserId)) {
-        return res.status(400).json({ message: "You cannot send request to yourself" });
+        return res
+          .status(400)
+          .json({ message: "You cannot send request to yourself" });
       }
 
-      // Can only send to mentors
-      if (toUser.role !== "mentor") {
-        return res.status(400).json({ message: "Requests can only be sent to mentors" });
+      // Check if receiver exists
+      const toUser = await User.findById(toUserId);
+      if (!toUser || toUser.role !== "mentor") {
+        return res
+          .status(400)
+          .json({ message: "Requests can only be sent to mentors" });
+      }
+
+      // BLOCK CHECK
+      const isBlocked = await Block.findOne({
+        blockedBy: toUserId,   // mentor
+        blockedUser: fromUserId // student
+      });
+
+      if (isBlocked) {
+        throw new Error("You are blocked by this mentor");
       }
 
       // Check if request already exists
@@ -72,13 +84,12 @@ requestRouter.post(
   }
 );
 
-
 requestRouter.post(
   "/request/review/:status/:userId",
   userAuth,
   async (req, res) => {
     try {
-      const loggedInUser = req.user;        // must be mentor
+      const loggedInUser = req.user; // must be mentor
       const fromUserId = req.params.userId; // student
       const toUserId = loggedInUser._id;
 
@@ -99,7 +110,7 @@ requestRouter.post(
       const existingRequest = await ConnectionRequestModel.findOne({
         fromUserId,
         toUserId,
-        status: "interested"
+        status: "interested",
       });
 
       if (!existingRequest) {
@@ -114,7 +125,6 @@ requestRouter.post(
         message: `Request ${status} successfully`,
         data: updatedRequest,
       });
-
     } catch (err) {
       res.status(400).send("ERROR : " + err.message);
     }

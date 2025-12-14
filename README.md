@@ -49,4 +49,6 @@
 - created GET user/connection //for both mentor and student
 
 - Recovery Successfull
-
+- created a block Schema
+- created a block/unblock API for Mentor
+- modified the request/sent API ( block student will not be allowed to sent req again to same mentor)
