@@ -20,8 +20,8 @@ UserRouter
  - GET/user/connections
  - GET/user/request/recieved
  - GET/user/feed - gets you the profile of other users on platform
-
-
+ - POST/user/block/:studentId
+ - DELETE/user/unblock/:studentId
 
  Status - ignored , interested , accepted , rejected
 
