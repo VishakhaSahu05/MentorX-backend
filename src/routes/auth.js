@@ -5,8 +5,6 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-
-
 authRouter.post("/signup", async (req, res) => {
   //validation of data
   try {
@@ -45,22 +43,25 @@ authRouter.post("/login", async (req, res) => {
 
     // Send cookie
     res.cookie("token", token, {
-      expires: new Date(Date.now() + 8 * 3600000), 
+      expires: new Date(Date.now() + 8 * 3600000),
       httpOnly: true,
-      sameSite: "strict"
+      sameSite: "lax",
+      secure: false,
     });
 
-    res.send("Login Successful");
+  res.json(user); 
   } catch (err) {
     res.status(500).send("ERROR: " + err.message);
   }
 });
 
-authRouter.post("/logout" , async(req , res) =>{
-    res.cookie("token" , null,{
-        expires: new Date(Date.now()),
-
-    });
-    res.send("Logout Successful!");
+authRouter.post("/logout", async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false, // prod me true
+    path: "/",
+  });
+  res.send("Logout Successful!");
 });
 module.exports = authRouter;

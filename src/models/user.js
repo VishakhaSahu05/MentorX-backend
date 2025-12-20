@@ -67,9 +67,7 @@ const userSchema = mongoose.Schema(
 
     experience: [
       {
-        company: String,
-        role: String,
-        duration: String,
+        type: String,
       },
     ],
 

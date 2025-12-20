@@ -3,8 +3,8 @@ const profileRouter = express.Router();
 const User = require("../models/user");
 const { userAuth } = require("../middleware/auth");
 const { validateEditProfileData } = require("../utils/validation");
-const validator = require("validator");   
-const bcrypt = require("bcrypt");         
+const validator = require("validator");
+const bcrypt = require("bcrypt");
 
 profileRouter.get("/profile/view", userAuth, async (req, res) => {
   try {
@@ -16,6 +16,11 @@ profileRouter.get("/profile/view", userAuth, async (req, res) => {
 
 profileRouter.patch("/profile/edit", userAuth, async (req, res) => {
   try {
+    Object.keys(req.body).forEach((key) => {
+      if (req.body[key] === "" || req.body[key] === null) {
+        delete req.body[key];
+      }
+    });
     if (!validateEditProfileData(req)) {
       throw new Error("Invalid Edit Request");
     }
@@ -44,7 +49,6 @@ profileRouter.patch("/profile/edit", userAuth, async (req, res) => {
       message: `${user.firstName}, Your Profile Updated Successfully`,
       data: user,
     });
-
   } catch (err) {
     res.status(400).send("ERROR: " + err.message);
   }
@@ -79,11 +83,9 @@ profileRouter.patch("/profile/password", userAuth, async (req, res) => {
     res.json({
       message: "Password updated successfully",
     });
-
   } catch (err) {
     res.status(400).send("ERROR: " + err.message);
   }
 });
-
 
 module.exports = profileRouter;

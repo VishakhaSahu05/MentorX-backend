@@ -99,7 +99,7 @@ userRouter.get("/feed", userAuth, async (req, res) => {
       });
     }
 
-    // Exclude mentors already interacted with
+    // Exclude already interacted mentors
     const interactedRequests = await ConnectionRequestModel.find({
       fromUserId: loggedInUser._id,
       status: { $in: ["interested", "accepted"] },
@@ -107,37 +107,45 @@ userRouter.get("/feed", userAuth, async (req, res) => {
 
     const excludedMentorIds = interactedRequests.map((r) => r.toUserId);
 
-    // Exclude mentors who blocked this student
+    //  Exclude mentors who blocked this student
     const blockedMentors = await Block.find({
       blockedUser: loggedInUser._id,
     }).select("blockedBy");
 
     const blockedMentorIds = blockedMentors.map((b) => b.blockedBy);
 
-    // Pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = 10;
-    const skip = (page - 1) * limit;
+    const excludeIds = [
+      ...excludedMentorIds,
+      ...blockedMentorIds,
+      loggedInUser._id,
+    ];
 
-    const mentors = await User.find({
+    // SAME DEPARTMENT mentors (priority)
+    const sameDeptMentors = await User.find({
       role: "mentor",
       department: loggedInUser.department,
-      _id: {
-        $nin: [...excludedMentorIds, ...blockedMentorIds],
-        $ne: loggedInUser._id,
-      },
+      _id: { $nin: excludeIds },
     })
       .select("firstName lastName emailId skills profilePic department")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+      .sort({ createdAt: -1 });
+
+    // OTHER DEPARTMENT mentors
+    const otherDeptMentors = await User.find({
+      role: "mentor",
+      department: { $ne: loggedInUser.department },
+      _id: { $nin: excludeIds },
+    })
+      .select("firstName lastName emailId skills profilePic department")
+      .sort({ createdAt: -1 });
+
+    // Combine both (same dept first)
+    const mentors = [...sameDeptMentors, ...otherDeptMentors];
 
     return res.json({
       message:
         mentors.length === 0
           ? "No mentors available right now"
           : "Feed fetched successfully",
-      page,
       count: mentors.length,
       mentors,
     });

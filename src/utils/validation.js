@@ -23,10 +23,10 @@ const validateSignUpData = (req) => {
 };
 
 const validateEditProfileData = (req) => {
+  
   const allowedEditFields = [
     "firstName",
     "lastName",
-    "emailId",
     "profilePic",
     "about",
     "experience",
@@ -42,9 +42,9 @@ const validateEditProfileData = (req) => {
 
   if (!isEditAllowed) return false;
 
-  if (req.body.emailId && !validator.isEmail(req.body.emailId)) {
-    return false;
-  }
+  // if (req.body.emailId && !validator.isEmail(req.body.emailId)) {
+  //   return false;
+  // }
 
   return true;
 };
