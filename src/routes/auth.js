@@ -4,13 +4,12 @@ const { validateSignUpData } = require("../utils/validation");
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-
 authRouter.post("/signup", async (req, res) => {
-  //validation of data
   try {
     validateSignUpData(req);
-    //encryption of password
+
     const { firstName, lastName, emailId, password, role } = req.body;
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = new User({
@@ -22,11 +21,30 @@ authRouter.post("/signup", async (req, res) => {
     });
 
     await user.save();
-    res.send("User Added Successfully!");
+
+    const token = await user.getJWT();
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+    });
+
+    res.status(201).json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      emailId: user.emailId,
+      role: user.role,
+      profilePic: user.profilePic,
+    });
+
   } catch (err) {
-    res.status(400).send("Error saving the user" + err.message);
+    res.status(400).json({ message: err.message });
   }
 });
+
+
 
 authRouter.post("/login", async (req, res) => {
   try {

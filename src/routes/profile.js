@@ -8,11 +8,27 @@ const bcrypt = require("bcrypt");
 
 profileRouter.get("/profile/view", userAuth, async (req, res) => {
   try {
-    res.send(req.user);
+    const user = req.user;
+
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      emailId: user.emailId,
+      role: user.role,
+      profilePic: user.profilePic,
+      gender: user.gender,
+      department: user.department,
+      skills: user.skills,
+      experience: user.experience,
+      age: user.age,
+      about: user.about,
+    });
   } catch (err) {
-    res.status(400).send("ERROR : " + err.message);
+    res.status(400).json({ message: err.message });
   }
 });
+
 
 profileRouter.patch("/profile/edit", userAuth, async (req, res) => {
   try {
