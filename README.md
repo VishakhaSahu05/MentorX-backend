@@ -52,3 +52,31 @@
 - created a block Schema
 - created a block/unblock API for Mentor
 - modified the request/sent API ( block student will not be allowed to sent req again to same mentor)
+
+- Created account and Installed S3 
+- Configured S3 in backend
+- Upload API created
+
+
+# Core Flow
+
+- Mentors create posts with media (image/video)
+- Media is uploaded to AWS S3
+- The returned media URL is saved along with post data in MongoDB
+- Students can view mentor posts via a feed.
+- Mentors can view their own posts in their dashboard.
+
+# Student Feed
+
+- Students can view all mentor posts.
+- Posts are displayed in latest-first order.
+- Each post includes:
+- Mentor name
+- Mentor profile picture
+- Media (image/video)
+- Caption
+- Students can click on a mentor to view their full profile.
+
+
+- completed the Feed API
+- mentor profile API

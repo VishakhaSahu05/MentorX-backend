@@ -4,6 +4,9 @@ const { userAuth } = require("../middleware/auth");
 const User = require("../models/user");
 const Block = require("../models/block");
 const ConnectionRequestModel = require("../models/connectionRequest");
+const { getFeed } = require("../controllers/feedController");
+const { getMyPosts } = require("../controllers/getMyPosts");
+const { deletePost } = require("../controllers/deletePost");
 
  
 userRouter.get("/user/requests/received", userAuth, async (req, res) => {
@@ -16,7 +19,7 @@ userRouter.get("/user/requests/received", userAuth, async (req, res) => {
       });
     }
 
-    // 🔒 Exclude blocked students
+    // Exclude blocked students
     const blockedStudents = await Block.find({
       blockedBy: loggedInUser._id,
     }).select("blockedUser");
@@ -89,71 +92,9 @@ userRouter.get("/user/connection", userAuth, async (req, res) => {
 
 //STUDENT FEED
  
-userRouter.get("/feed", userAuth, async (req, res) => {
-  try {
-    const loggedInUser = req.user;
-
-    if (loggedInUser.role !== "student") {
-      return res.status(403).json({
-        message: "Feed is only available for students",
-      });
-    }
-
-    // Exclude already interacted mentors
-    const interactedRequests = await ConnectionRequestModel.find({
-      fromUserId: loggedInUser._id,
-      status: { $in: ["interested", "accepted"] },
-    }).select("toUserId");
-
-    const excludedMentorIds = interactedRequests.map((r) => r.toUserId);
-
-    //  Exclude mentors who blocked this student
-    const blockedMentors = await Block.find({
-      blockedUser: loggedInUser._id,
-    }).select("blockedBy");
-
-    const blockedMentorIds = blockedMentors.map((b) => b.blockedBy);
-
-    const excludeIds = [
-      ...excludedMentorIds,
-      ...blockedMentorIds,
-      loggedInUser._id,
-    ];
-
-    // SAME DEPARTMENT mentors (priority)
-    const sameDeptMentors = await User.find({
-      role: "mentor",
-      department: loggedInUser.department,
-      _id: { $nin: excludeIds },
-    })
-      .select("firstName lastName emailId skills profilePic department")
-      .sort({ createdAt: -1 });
-
-    // OTHER DEPARTMENT mentors
-    const otherDeptMentors = await User.find({
-      role: "mentor",
-      department: { $ne: loggedInUser.department },
-      _id: { $nin: excludeIds },
-    })
-      .select("firstName lastName emailId skills profilePic department")
-      .sort({ createdAt: -1 });
-
-    // Combine both (same dept first)
-    const mentors = [...sameDeptMentors, ...otherDeptMentors];
-
-    return res.json({
-      message:
-        mentors.length === 0
-          ? "No mentors available right now"
-          : "Feed fetched successfully",
-      count: mentors.length,
-      mentors,
-    });
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-
+userRouter.get("/feed" , userAuth  , getFeed);
+userRouter.get("/my-posts", userAuth, getMyPosts);
+userRouter.delete("/post" , userAuth , deletePost);
 
 // BLOCK STUDENT (MENTOR)
 userRouter.post("/user/block/:studentId", userAuth, async (req, res) => {
