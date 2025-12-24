@@ -94,7 +94,7 @@ userRouter.get("/user/connection", userAuth, async (req, res) => {
  
 userRouter.get("/feed" , userAuth  , getFeed);
 userRouter.get("/my-posts", userAuth, getMyPosts);
-userRouter.delete("/post" , userAuth , deletePost);
+userRouter.delete("/post/:postId", userAuth, deletePost);
 
 // BLOCK STUDENT (MENTOR)
 userRouter.post("/user/block/:studentId", userAuth, async (req, res) => {
