@@ -11,7 +11,7 @@ exports.getFeed = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const posts = await Post.find()
-      .populate("mentor", "firstName lastName profilePic role")
+      .populate("mentor", "_id firstName lastName profilePic role")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);

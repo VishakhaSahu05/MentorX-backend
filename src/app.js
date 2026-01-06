@@ -18,12 +18,14 @@ const profileRouter = require("./routes/profile");
 const requestRouter = require("./routes/request");
 const userRouter = require("./routes/user");
 const contentRouter = require("./routes/content");
+const dashboardRouter = require("./routes/dashboard");
 
 app.use("/" , authRouter);
 app.use("/" , profileRouter);
 app.use("/" , requestRouter);
 app.use("/" , userRouter);
 app.use("/" , contentRouter);
+app.use("/" , dashboardRouter);
 
 connectDB()
   .then(() => {
