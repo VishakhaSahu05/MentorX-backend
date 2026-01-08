@@ -82,3 +82,11 @@
 - mentor profile API
 - created the my-post API for mentor
 - created the post delete API
+
+
+# Important:
+- Data is fetched directly from DB or shared service functions
+- No API-to-API calls
+
+- built the mentor Event model fir auto delete when the event gets over
+- built the APIs of mentor event - post / get / delete

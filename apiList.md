@@ -38,6 +38,7 @@ UserRouter
 - Fetch ratings
 - Fetch any extra info (profile, stats, etc.)
 
-# Important:
-- Data is fetched directly from DB or shared service functions
-- No API-to-API calls
+# APIs for Calendar
+- POST /mentor/event → event add
+- GET /mentor/event → mentor ke events
+- DELETE /mentor/event/:id → manual delete (optional)

@@ -19,6 +19,7 @@ const requestRouter = require("./routes/request");
 const userRouter = require("./routes/user");
 const contentRouter = require("./routes/content");
 const dashboardRouter = require("./routes/dashboard");
+const eventRouter = require("./routes/eventRouter");
 
 app.use("/" , authRouter);
 app.use("/" , profileRouter);
@@ -26,6 +27,7 @@ app.use("/" , requestRouter);
 app.use("/" , userRouter);
 app.use("/" , contentRouter);
 app.use("/" , dashboardRouter);
+app.use("/" , eventRouter);
 
 connectDB()
   .then(() => {
