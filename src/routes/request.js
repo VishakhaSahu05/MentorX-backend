@@ -131,4 +131,30 @@ requestRouter.post(
   }
 );
 
+requestRouter.get(
+  "/request/status/:mentorId",
+  userAuth,
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const mentorId = req.params.mentorId;
+
+      const request = await ConnectionRequestModel.findOne({
+        $or: [
+          { fromUserId: userId, toUserId: mentorId },
+          { fromUserId: mentorId, toUserId: userId },
+        ],
+      });
+
+      if (!request) {
+        return res.json({ status: "none" });
+      }
+
+      return res.json({ status: request.status });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+  }
+);
+
 module.exports = requestRouter;

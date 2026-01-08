@@ -25,3 +25,19 @@ UserRouter
 
  Status - ignored , interested , accepted , rejected
 
+# Mentor Dashboard API
+- GET/mentor/:userId -> gets mentor's dashboard on the student's feed
+- Backend entry point
+- Request hits Dashboard Controller
+- User is already authenticated (req.user available)
+
+# Data fetching (inside backend)
+- Inside the dashboard API:
+- Fetch connections / followers
+- Fetch posts
+- Fetch ratings
+- Fetch any extra info (profile, stats, etc.)
+
+# Important:
+- Data is fetched directly from DB or shared service functions
+- No API-to-API calls
