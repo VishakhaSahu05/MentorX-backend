@@ -8,7 +8,6 @@ const { getFeed } = require("../controllers/feedController");
 const { getMyPosts } = require("../controllers/getMyPosts");
 const { deletePost } = require("../controllers/deletePost");
 
- 
 userRouter.get("/user/requests/received", userAuth, async (req, res) => {
   try {
     const loggedInUser = req.user;
@@ -46,7 +45,6 @@ userRouter.get("/user/requests/received", userAuth, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
-
 
 // GET CONNECTIONS (STUDENT + MENTOR)
 userRouter.get("/user/connection", userAuth, async (req, res) => {
@@ -91,10 +89,34 @@ userRouter.get("/user/connection", userAuth, async (req, res) => {
 });
 
 //STUDENT FEED
- 
-userRouter.get("/feed" , userAuth  , getFeed);
+
+userRouter.get("/feed", userAuth, getFeed);
 userRouter.get("/my-posts", userAuth, getMyPosts);
 userRouter.delete("/post/:postId", userAuth, deletePost);
+// GET USER PROFILE BY ID (FOR CHAT / PROFILE)
+userRouter.get("/user/profile/:userId", userAuth, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId).select(
+      "firstName lastName role profilePic skills about department"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    return res.json({
+      user,
+    });
+  } catch (err) {
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+});
 
 // BLOCK STUDENT (MENTOR)
 userRouter.post("/user/block/:studentId", userAuth, async (req, res) => {
@@ -173,7 +195,6 @@ userRouter.delete("/user/unblock/:studentId", userAuth, async (req, res) => {
     res.json({
       message: "User unblocked successfully",
     });
-
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

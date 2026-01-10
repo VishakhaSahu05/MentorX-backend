@@ -90,3 +90,6 @@
 
 - built the mentor Event model fir auto delete when the event gets over
 - built the APIs of mentor event - post / get / delete
+
+
+# Real Time chat using WebSocket (Socket.io)
