@@ -15,14 +15,31 @@ exports.deletePost = async (req, res) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    const key = post.mediaUrl.split("/").slice(3).join("/");
+    // helper to extract key safely
+    const getKeyFromUrl = (url) =>
+      decodeURIComponent(new URL(url).pathname.substring(1));
+
+    // 🔹 delete main media (image / video)
+    const mediaKey = getKeyFromUrl(post.mediaUrl);
 
     await s3.send(
       new DeleteObjectCommand({
         Bucket: process.env.AWS_BUCKET_NAME,
-        Key: key,
+        Key: mediaKey,
       })
     );
+
+    // 🔹 delete thumbnail IF EXISTS (video case)
+    if (post.mediaType === "video" && post.thumbnailUrl) {
+      const thumbKey = getKeyFromUrl(post.thumbnailUrl);
+
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: thumbKey,
+        })
+      );
+    }
 
     await Post.findByIdAndDelete(postId);
 

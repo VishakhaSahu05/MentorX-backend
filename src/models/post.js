@@ -11,6 +11,10 @@ const postSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    thumbnailUrl: {
+      type: String,
+      default: null,
+    },
     caption: {
       type: String,
       default: "",
