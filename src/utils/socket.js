@@ -2,7 +2,9 @@ const socket = require("socket.io");
 const crypto = require("crypto");
 const { Chat } = require("../models/chat");
 
-// 🔐 Private room id for 1–1 chat
+//io.on = server level (sab users)
+//socket.on = ek specific user (one connection)
+
 const getSecretRoomId = (userId, targetUserId) => {
   return crypto
     .createHash("sha256")
@@ -17,15 +19,29 @@ const initializeSocket = (server) => {
     },
   });
 
+  const userSocketMap = new Map(); //userId 101 → socketId abc123
+  const userDetailsMap = new Map(); // userId -> user details (for caller info)
+
   io.on("connection", (socket) => {
-    // ================= JOIN CHAT =================
+    console.log("User Connected:", socket.id);
+
+    //Register immediately on connection
+    socket.on(
+      "user:register",
+      ({ userId, firstName, lastName, profilePic }) => {
+        userSocketMap.set(userId, socket.id);
+        userDetailsMap.set(userId, { firstName, lastName, profilePic });
+        console.log(`User ${userId} registered with socket ${socket.id}`);
+      },
+    );
+
+    //Join Chat
     socket.on("joinChat", ({ firstName, userId, targetUserId }) => {
       const roomId = getSecretRoomId(userId, targetUserId);
       console.log(firstName + " Joined Room: " + roomId);
       socket.join(roomId);
     });
 
-    // ================= SEND MESSAGE (TEXT / VOICE) =================
     socket.on(
       "setMessage",
       async (
@@ -38,15 +54,13 @@ const initializeSocket = (server) => {
           mediaUrl,
           duration,
         },
-        callback // ✅ ADD: delivery ACK (optional)
+        callback,
       ) => {
         const roomId = getSecretRoomId(userId, targetUserId);
-
         try {
           let chat = await Chat.findOne({
             participants: { $all: [userId, targetUserId] },
           });
-
           if (!chat) {
             chat = new Chat({
               participants: [userId, targetUserId],
@@ -54,7 +68,6 @@ const initializeSocket = (server) => {
             });
           }
 
-          // 🔹 SAME message structure + ADD support
           const message = {
             senderId: userId,
             type,
@@ -72,7 +85,6 @@ const initializeSocket = (server) => {
           chat.messages.push(message);
           await chat.save();
 
-          // 🔁 SAME emit (chat flow unchanged)
           io.to(roomId).emit("messageRecieved", {
             senderId: userId,
             type,
@@ -81,21 +93,18 @@ const initializeSocket = (server) => {
             duration: message.duration,
           });
 
-          // ✅ ADD: delivery confirmation
           if (callback) {
             callback({ status: "delivered" });
           }
         } catch (err) {
-          console.log("Socket message error:", err);
-
+          console.log("Socket message error", err);
           if (callback) {
             callback({ status: "error" });
           }
         }
-      }
+      },
     );
 
-    // ================= TYPING INDICATOR (ADD ONLY) =================
     socket.on("typing", ({ userId, targetUserId }) => {
       const roomId = getSecretRoomId(userId, targetUserId);
       socket.to(roomId).emit("userTyping", { userId });
@@ -106,9 +115,98 @@ const initializeSocket = (server) => {
       socket.to(roomId).emit("userStopTyping", { userId });
     });
 
-    // ================= DISCONNECT =================
+    //video call signalling
+    socket.on("video-call:start", ({ to }) => {
+      const targetSocketId = userSocketMap.get(to);
+
+      const callerUserId = [...userSocketMap.entries()].find(
+        ([_, socketId]) => socketId === socket.id,
+      )?.[0];
+
+      console.log(
+        `Call from ${socket.id} (user: ${callerUserId}) to user ${to} (socket: ${targetSocketId})`,
+      );
+
+      if (targetSocketId && callerUserId) {
+        const callerDetails = userDetailsMap.get(callerUserId);
+
+        io.to(targetSocketId).emit("video-call:incoming", {
+          caller: {
+            _id: callerUserId,
+            firstName: callerDetails?.firstName || "Unknown",
+            lastName: callerDetails?.lastName || "",
+            profilePic: callerDetails?.profilePic || "",
+          },
+        });
+
+        console.log(`Sent incoming call notification to ${to}`);
+      } else {
+        socket.emit("video-call:user-offline");
+      }
+    });
+
+    socket.on("video-call:accepted", ({ to }) => {
+      const targetSocketId = userSocketMap.get(to);
+      console.log(
+        `✅ SERVER: accepted received, forwarding create-offer to ${to}, socketId: ${targetSocketId}, exists: ${!!targetSocketId}`,
+      );
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:create-offer");
+      }
+    });
+
+    socket.on("video-call:rejected", ({ to }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:rejected");
+      }
+    });
+
+    socket.on("video-call:cancel", ({ to }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:cancelled");
+      }
+    });
+
+    socket.on("video-call:offer", ({ to, offer }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:offer", { offer });
+      }
+    });
+
+    socket.on("video-call:answer", ({ to, answer }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:answer", { answer });
+      }
+    });
+
+    socket.on("video-call:ice", ({ to, candidate }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:ice", { candidate });
+      }
+    });
+
+    socket.on("video-call:end", ({ to }) => {
+      const targetSocketId = userSocketMap.get(to);
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("video-call:end");
+      }
+    });
+
     socket.on("disconnect", () => {
-      console.log("User disconnected");
+      for (const [userId, socketId] of userSocketMap.entries()) {
+        if (socketId === socket.id) {
+          userSocketMap.delete(userId);
+          userDetailsMap.delete(userId);
+          break;
+        }
+      }
+      console.log("User disconnected:", socket.id);
     });
   });
 };
