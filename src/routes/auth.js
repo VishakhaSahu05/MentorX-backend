@@ -26,8 +26,8 @@ authRouter.post("/signup", async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false,
+      sameSite: "none",
+      secure: true,
     });
 
     res.status(201).json({
@@ -38,13 +38,10 @@ authRouter.post("/signup", async (req, res) => {
       role: user.role,
       profilePic: user.profilePic,
     });
-
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 });
-
-
 
 authRouter.post("/login", async (req, res) => {
   try {
@@ -61,13 +58,12 @@ authRouter.post("/login", async (req, res) => {
 
     // Send cookie
     res.cookie("token", token, {
-      expires: new Date(Date.now() + 8 * 3600000),
       httpOnly: true,
-      sameSite: "lax",
-      secure: false,
+      sameSite: "none",
+      secure: true,
     });
 
-  res.json(user); 
+    res.json(user);
   } catch (err) {
     res.status(500).send("ERROR: " + err.message);
   }

@@ -14,6 +14,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "https://mentor-x-1qj4.vercel.app",
+      "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
     ],
     credentials: true,
   })
