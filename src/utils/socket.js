@@ -13,10 +13,18 @@ const getSecretRoomId = (userId, targetUserId) => {
 };
 
 const initializeSocket = (server) => {
-  const io = socket(server, {
-    cors: {
-      origin: "http://localhost:5173",
-    },
+ const io = socket(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://mentor-x-cyan.vercel.app",
+      "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
+    ],
+    credentials: true,
+    methods: ["GET", "POST"],
+  },
+
+  transports: ["websocket", "polling"],
   });
 
   const userSocketMap = new Map(); //userId 101 → socketId abc123
