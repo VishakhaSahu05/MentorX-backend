@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const { RtcTokenBuilder, RtcRole } = require("agora-token");
 const express = require("express");
 const connectDB = require("./config/database");
 const app = express();
@@ -33,6 +34,24 @@ const dashboardRouter = require("./routes/dashboard");
 const eventRouter = require("./routes/eventRouter");
 const chatRouter = require("./routes/chat");
 const voiceRouter = require("./routes/voice");
+app.get("/api/agora-token", (req, res) => {
+  const { channelName, uid } = req.query;
+  const expirationTimeInSeconds = 3600;
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+  const token = RtcTokenBuilder.buildTokenWithUid(
+    process.env.AGORA_APP_ID,
+    process.env.AGORA_APP_CERTIFICATE,
+    channelName,
+    uid || 0,
+    RtcRole.PUBLISHER,
+    privilegeExpiredTs,
+    privilegeExpiredTs,
+  );
+
+  res.json({ token, appId: process.env.AGORA_APP_ID });
+});
 
 // SOCKET
 const initializeSocket = require("./utils/socket");
