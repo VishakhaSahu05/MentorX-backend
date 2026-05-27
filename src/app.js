@@ -47,8 +47,6 @@ app.use("/", dashboardRouter);
 app.use("/", eventRouter);
 app.use("/", chatRouter);
 app.use("/", voiceRouter);
-
-// STATIC
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // SERVER
