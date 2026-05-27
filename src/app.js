@@ -52,10 +52,20 @@ app.get("/api/ice-servers", async (req, res) => {
     const response = await fetch(
       `https://${process.env.METERED_DOMAIN}/api/v1/turn/credentials?apiKey=${process.env.METERED_SECRET_KEY}`,
     );
-    const iceServers = await response.json();
+
+    const text = await response.text();
+    console.log("Metered response:", text); // debug log
+
+    const iceServers = JSON.parse(text);
+
+    if (!Array.isArray(iceServers)) {
+      throw new Error("ICE servers is not an array: " + text);
+    }
+
     res.json(iceServers);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch ICE servers" });
+    console.error("ICE server fetch error:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
