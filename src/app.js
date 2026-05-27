@@ -47,22 +47,6 @@ app.use("/", dashboardRouter);
 app.use("/", eventRouter);
 app.use("/", chatRouter);
 app.use("/", voiceRouter);
-app.get("/api/ice-servers", async (req, res) => {
-  try {
-    const url = `https://${process.env.METERED_DOMAIN}/api/v1/turn/credentials?apiKey=${process.env.METERED_SECRET_KEY}`;
-    console.log("Fetching ICE servers from:", url); // debug
-
-    const response = await fetch(url);
-    const text = await response.text();
-    console.log("Metered response:", text); // debug
-
-    const iceServers = JSON.parse(text);
-    res.json(iceServers);
-  } catch (err) {
-    console.error("ICE server fetch error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // STATIC
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
