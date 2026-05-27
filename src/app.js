@@ -17,7 +17,7 @@ app.use(
       "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
     ],
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -47,6 +47,17 @@ app.use("/", dashboardRouter);
 app.use("/", eventRouter);
 app.use("/", chatRouter);
 app.use("/", voiceRouter);
+app.get("/api/ice-servers", async (req, res) => {
+  try {
+    const response = await fetch(
+      `https://${process.env.METERED_DOMAIN}/api/v1/turn/credentials?apiKey=${process.env.METERED_SECRET_KEY}`,
+    );
+    const iceServers = await response.json();
+    res.json(iceServers);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch ICE servers" });
+  }
+});
 
 // STATIC
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
