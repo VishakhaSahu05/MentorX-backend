@@ -2,9 +2,7 @@ const socket = require("socket.io");
 const crypto = require("crypto");
 const { Chat } = require("../models/chat");
 
-//io.on = server level (sab users)
-//socket.on = ek specific user (one connection)
-
+// Create unique room id
 const getSecretRoomId = (userId, targetUserId) => {
   return crypto
     .createHash("sha256")
@@ -13,43 +11,65 @@ const getSecretRoomId = (userId, targetUserId) => {
 };
 
 const initializeSocket = (server) => {
- const io = socket(server, {
-  cors: {
-    origin: [
-      "http://localhost:5173",
-      "https://mentor-x-cyan.vercel.app",
-      "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
-    ],
-    credentials: true,
-    methods: ["GET", "POST"],
-  },
+  const io = socket(server, {
+    cors: {
+      origin: [
+        "http://localhost:5173",
+        "https://mentor-x-cyan.vercel.app",
+        "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
+      ],
+      credentials: true,
+      methods: ["GET", "POST"],
+    },
 
-  transports: ["websocket", "polling"],
+    transports: ["websocket"],
   });
 
-  const userSocketMap = new Map(); //userId 101 → socketId abc123
-  const userDetailsMap = new Map(); // userId -> user details (for caller info)
+  // userId -> socketId
+  const userSocketMap = new Map();
+
+  // userId -> user details
+  const userDetailsMap = new Map();
 
   io.on("connection", (socket) => {
     console.log("User Connected:", socket.id);
 
-    //Register immediately on connection
     socket.on(
       "user:register",
       ({ userId, firstName, lastName, profilePic }) => {
-        userSocketMap.set(userId, socket.id);
-        userDetailsMap.set(userId, { firstName, lastName, profilePic });
-        console.log(`User ${userId} registered with socket ${socket.id}`);
-      },
+        const userIdString = String(userId);
+
+        userSocketMap.set(userIdString, socket.id);
+
+        userDetailsMap.set(userIdString, {
+          firstName,
+          lastName,
+          profilePic,
+        });
+
+        console.log(
+          `User ${userIdString} registered with socket ${socket.id}`
+        );
+
+        console.log(
+          "Current Socket Map:",
+          [...userSocketMap.entries()]
+        );
+      }
     );
+    socket.on(
+      "joinChat",
+      ({ firstName, userId, targetUserId }) => {
+        const roomId = getSecretRoomId(
+          String(userId),
+          String(targetUserId)
+        );
 
-    //Join Chat
-    socket.on("joinChat", ({ firstName, userId, targetUserId }) => {
-      const roomId = getSecretRoomId(userId, targetUserId);
-      console.log(firstName + " Joined Room: " + roomId);
-      socket.join(roomId);
-    });
+        console.log(firstName + " Joined Room: " + roomId);
 
+        socket.join(roomId);
+      }
+    );
     socket.on(
       "setMessage",
       async (
@@ -62,13 +82,18 @@ const initializeSocket = (server) => {
           mediaUrl,
           duration,
         },
-        callback,
+        callback
       ) => {
-        const roomId = getSecretRoomId(userId, targetUserId);
+        const roomId = getSecretRoomId(
+          String(userId),
+          String(targetUserId)
+        );
+
         try {
           let chat = await Chat.findOne({
             participants: { $all: [userId, targetUserId] },
           });
+
           if (!chat) {
             chat = new Chat({
               participants: [userId, targetUserId],
@@ -91,6 +116,7 @@ const initializeSocket = (server) => {
           }
 
           chat.messages.push(message);
+
           await chat.save();
 
           io.to(roomId).emit("messageRecieved", {
@@ -105,116 +131,191 @@ const initializeSocket = (server) => {
             callback({ status: "delivered" });
           }
         } catch (err) {
-          console.log("Socket message error", err);
+          console.log("Socket message error:", err);
+
           if (callback) {
             callback({ status: "error" });
           }
         }
-      },
+      }
     );
-
     socket.on("typing", ({ userId, targetUserId }) => {
-      const roomId = getSecretRoomId(userId, targetUserId);
-      socket.to(roomId).emit("userTyping", { userId });
+      const roomId = getSecretRoomId(
+        String(userId),
+        String(targetUserId)
+      );
+
+      socket.to(roomId).emit("userTyping", {
+        userId,
+      });
     });
 
     socket.on("stopTyping", ({ userId, targetUserId }) => {
-      const roomId = getSecretRoomId(userId, targetUserId);
-      socket.to(roomId).emit("userStopTyping", { userId });
+      const roomId = getSecretRoomId(
+        String(userId),
+        String(targetUserId)
+      );
+
+      socket.to(roomId).emit("userStopTyping", {
+        userId,
+      });
     });
 
-    //video call signalling
+    // =========================
+    // VIDEO CALL START
+    // =========================
     socket.on("video-call:start", ({ to }) => {
-      const targetSocketId = userSocketMap.get(to);
+      const targetSocketId = userSocketMap.get(String(to));
 
       const callerUserId = [...userSocketMap.entries()].find(
-        ([_, socketId]) => socketId === socket.id,
+        ([_, socketId]) => socketId === socket.id
       )?.[0];
 
       console.log(
-        `Call from ${socket.id} (user: ${callerUserId}) to user ${to} (socket: ${targetSocketId})`,
+        `Call from ${socket.id} to user ${to}, target socket: ${targetSocketId}`
       );
 
       if (targetSocketId && callerUserId) {
-        const callerDetails = userDetailsMap.get(callerUserId);
+        const callerDetails =
+          userDetailsMap.get(String(callerUserId));
 
         io.to(targetSocketId).emit("video-call:incoming", {
           caller: {
             _id: callerUserId,
-            firstName: callerDetails?.firstName || "Unknown",
-            lastName: callerDetails?.lastName || "",
-            profilePic: callerDetails?.profilePic || "",
+            firstName:
+              callerDetails?.firstName || "Unknown",
+            lastName:
+              callerDetails?.lastName || "",
+            profilePic:
+              callerDetails?.profilePic || "",
           },
         });
 
-        console.log(`Sent incoming call notification to ${to}`);
+        console.log(
+          `Incoming call sent to user ${to}`
+        );
       } else {
         socket.emit("video-call:user-offline");
       }
     });
 
+    // =========================
+    // CALL ACCEPTED
+    // =========================
     socket.on("video-call:accepted", ({ to }) => {
-      const targetSocketId = userSocketMap.get(to);
+      const targetSocketId = userSocketMap.get(
+        String(to)
+      );
+
       console.log(
-        `✅ SERVER: accepted received, forwarding create-offer to ${to}, socketId: ${targetSocketId}, exists: ${!!targetSocketId}`,
+        "Accepted event:",
+        targetSocketId
       );
 
       if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:create-offer");
+        io.to(targetSocketId).emit(
+          "video-call:create-offer"
+        );
       }
     });
 
+    // =========================
+    // CALL REJECTED
+    // =========================
     socket.on("video-call:rejected", ({ to }) => {
-      const targetSocketId = userSocketMap.get(to);
+      const targetSocketId = userSocketMap.get(
+        String(to)
+      );
+
       if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:rejected");
+        io.to(targetSocketId).emit(
+          "video-call:rejected"
+        );
       }
     });
+
 
     socket.on("video-call:cancel", ({ to }) => {
-      const targetSocketId = userSocketMap.get(to);
+      const targetSocketId = userSocketMap.get(
+        String(to)
+      );
+
       if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:cancelled");
+        io.to(targetSocketId).emit(
+          "video-call:cancelled"
+        );
       }
     });
 
-    socket.on("video-call:offer", ({ to, offer }) => {
-      const targetSocketId = userSocketMap.get(to);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:offer", { offer });
-      }
-    });
+  
+    socket.on(
+      "video-call:offer",
+      ({ to, offer }) => {
+        const targetSocketId =
+          userSocketMap.get(String(to));
 
-    socket.on("video-call:answer", ({ to, answer }) => {
-      const targetSocketId = userSocketMap.get(to);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:answer", { answer });
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(
+            "video-call:offer",
+            { offer }
+          );
+        }
       }
-    });
+    );
+    socket.on(
+      "video-call:answer",
+      ({ to, answer }) => {
+        const targetSocketId =
+          userSocketMap.get(String(to));
 
-    socket.on("video-call:ice", ({ to, candidate }) => {
-      const targetSocketId = userSocketMap.get(to);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:ice", { candidate });
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(
+            "video-call:answer",
+            { answer }
+          );
+        }
       }
-    });
+    );
+    socket.on(
+      "video-call:ice",
+      ({ to, candidate }) => {
+        const targetSocketId =
+          userSocketMap.get(String(to));
 
+        if (targetSocketId) {
+          io.to(targetSocketId).emit(
+            "video-call:ice",
+            { candidate }
+          );
+        }
+      }
+    );
     socket.on("video-call:end", ({ to }) => {
-      const targetSocketId = userSocketMap.get(to);
+      const targetSocketId = userSocketMap.get(
+        String(to)
+      );
+
       if (targetSocketId) {
-        io.to(targetSocketId).emit("video-call:end");
+        io.to(targetSocketId).emit(
+          "video-call:end"
+        );
       }
     });
-
     socket.on("disconnect", () => {
       for (const [userId, socketId] of userSocketMap.entries()) {
         if (socketId === socket.id) {
           userSocketMap.delete(userId);
           userDetailsMap.delete(userId);
+
+          console.log(
+            `User disconnected: ${userId}`
+          );
+
           break;
         }
       }
-      console.log("User disconnected:", socket.id);
+
+      console.log("Socket disconnected:", socket.id);
     });
   });
 };
