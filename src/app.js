@@ -19,6 +19,7 @@ app.use(
       "https://mentor-mkhut6g5s-vishakhasahus-projects.vercel.app",
     ],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
