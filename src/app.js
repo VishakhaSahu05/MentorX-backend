@@ -17,6 +17,7 @@ app.use(
       "https://mentor-x-cyan.vercel.app",
       "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
       "https://mentor-mkhut6g5s-vishakhasahus-projects.vercel.app",
+      "https://mentor-x-git-whiteboard-testing-vishakhasahus-projects.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
