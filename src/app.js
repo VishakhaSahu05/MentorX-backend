@@ -4,11 +4,11 @@ const { RtcTokenBuilder, RtcRole } = require("agora-token");
 const express = require("express");
 const connectDB = require("./config/database");
 const app = express();
-
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const http = require("http");
 const path = require("path");
+
 
 app.use(
   cors({
@@ -37,6 +37,7 @@ const dashboardRouter = require("./routes/dashboard");
 const eventRouter = require("./routes/eventRouter");
 const chatRouter = require("./routes/chat");
 const voiceRouter = require("./routes/voice");
+const aiSummaryRoutes = require("./routes/aiSummaryRoutes");
 app.get("/api/agora-token", (req, res) => {
   const { channelName, uid } = req.query;
   const expirationTimeInSeconds = 3600;
@@ -70,6 +71,8 @@ app.use("/", eventRouter);
 app.use("/", chatRouter);
 app.use("/", voiceRouter);
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/api/ai-summary", aiSummaryRoutes);
+
 
 // SERVER
 const server = http.createServer(app);
