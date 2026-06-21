@@ -1,6 +1,8 @@
 const ffmpeg = require("fluent-ffmpeg");
+const ffmpegPath = require("ffmpeg-static");
 const path = require("path");
-const fs = require("fs");
+
+ffmpeg.setFfmpegPath(ffmpegPath);
 
 const generateThumbnail = (videoPath) => {
   return new Promise((resolve, reject) => {
@@ -16,8 +18,14 @@ const generateThumbnail = (videoPath) => {
         folder: path.dirname(thumbPath),
         size: "400x?"
       })
-      .on("end", () => resolve(thumbPath))
-      .on("error", reject);
+      .on("end", () => {
+        console.log("Thumbnail generated:", thumbPath);
+        resolve(thumbPath);
+      })
+      .on("error", (err) => {
+        console.error("Thumbnail error:", err);
+        reject(err);
+      });
   });
 };
 
