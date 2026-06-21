@@ -9,18 +9,11 @@ const cors = require("cors");
 const http = require("http");
 const path = require("path");
 
-
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "https://mentor-x-cyan.vercel.app",
-      "https://mentor-x-1qj4-9iswd7uxm-vishakhasahus-projects.vercel.app",
-      "https://mentor-mkhut6g5s-vishakhasahus-projects.vercel.app",
-      "https://mentor-x-git-whiteboard-testing-vishakhasahus-projects.vercel.app",
-    ],
+    origin: true,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
@@ -61,7 +54,6 @@ app.get("/api/agora-token", (req, res) => {
 // SOCKET
 const initializeSocket = require("./utils/socket");
 
-
 // ROUTES USE
 app.use("/", authRouter);
 app.use("/", profileRouter);
@@ -74,7 +66,6 @@ app.use("/", chatRouter);
 app.use("/", voiceRouter);
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/ai-summary", aiSummaryRoutes);
-
 
 // SERVER
 const server = http.createServer(app);
