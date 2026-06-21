@@ -21,9 +21,10 @@ app.use(
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
-
+app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
 
@@ -59,6 +60,7 @@ app.get("/api/agora-token", (req, res) => {
 
 // SOCKET
 const initializeSocket = require("./utils/socket");
+
 
 // ROUTES USE
 app.use("/", authRouter);
