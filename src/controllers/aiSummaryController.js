@@ -31,12 +31,28 @@ const summarizeConversation = async (req, res) => {
       messageCount: messages.length,
     });
   } catch (error) {
-    console.error("[AI Summary] Error:", error.message);
+    console.error("[AI Summary] Error:", error.status, error.message);
 
     if (error.status === 429) {
       return res.status(429).json({
         success: false,
         error: "AI service is busy. Please try again in a moment.",
+      });
+    }
+
+    if (error.status === 401 || error.status === 403) {
+      console.error("[AI Summary] Groq authentication failed — check GROQ_API_KEY.");
+      return res.status(503).json({
+        success: false,
+        error: "AI service is temporarily unavailable.",
+      });
+    }
+
+    if (error.status === 404) {
+      console.error("[AI Summary] Groq model not found — check the model name in aiSummaryServices.js.");
+      return res.status(503).json({
+        success: false,
+        error: "AI service is temporarily unavailable.",
       });
     }
 
