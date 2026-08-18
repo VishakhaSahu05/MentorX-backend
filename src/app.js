@@ -9,9 +9,26 @@ const cors = require("cors");
 const http = require("http");
 const path = require("path");
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://mentorx-cyan.vercel.app",
+  "https://mentor-x-cyan.vercel.app",
+];
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow non-browser requests (no Origin header) and any known/preview Vercel deployment
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/mentor-?x-[a-z0-9-]+\.vercel\.app$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
     credentials: true,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
     allowedHeaders: ["Content-Type", "Authorization"],
