@@ -14,6 +14,11 @@ const getCallRoomId = (userId, targetUserId) => {
   return [String(userId), String(targetUserId)].sort().join("_");
 };
 
+//voice call room ID 
+const getVoiceCallRoomId = (userId, targetUserId) => {
+  return "voice_" + [String(userId), String(targetUserId)].sort().join("_");
+};
+
 const initializeSocket = (server) => {
   const io = socket(server, {
     cors: {
@@ -212,6 +217,112 @@ const initializeSocket = (server) => {
         io.to(targetSocketId).emit("whiteboard:toggle", { open });
       }
     });
+    
+    socket.on("voice-call:start", ({ to }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      const callerUserId = [...userSocketMap.entries()].find(
+        ([_, sid]) => sid === socket.id,
+      )?.[0];
+
+      console.log(
+        `Voice call from ${socket.id} to user ${to}, target socket: ${targetSocketId}`,
+      );
+
+      if (targetSocketId && callerUserId) {
+        const callRoomId = getVoiceCallRoomId(callerUserId, to);
+
+        socket.join(callRoomId);
+
+        console.log(
+          `Caller ${callerUserId} joined voice call room: ${callRoomId}`,
+        );
+
+        const callerDetails = userDetailsMap.get(String(callerUserId));
+
+        io.to(targetSocketId).emit("voice-call:incoming", {
+          caller: {
+            _id: callerUserId,
+            firstName: callerDetails?.firstName || "Unknown",
+            lastName: callerDetails?.lastName || "",
+            profilePic: callerDetails?.profilePic || "",
+          },
+        });
+      } else {
+        socket.emit("voice-call:user-offline");
+      }
+    });
+
+    socket.on("voice-call:accepted", ({ to }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      const receiverUserId = [...userSocketMap.entries()].find(
+        ([_, sid]) => sid === socket.id,
+      )?.[0];
+
+      console.log("Voice call accepted event:", targetSocketId);
+
+      if (targetSocketId && receiverUserId) {
+        const callRoomId = getVoiceCallRoomId(receiverUserId, to);
+
+        socket.join(callRoomId);
+
+        console.log(
+          `Receiver ${receiverUserId} joined voice call room: ${callRoomId}`,
+        );
+
+        io.to(targetSocketId).emit("voice-call:create-offer");
+      }
+    });
+
+    socket.on("voice-call:rejected", ({ to }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:rejected");
+      }
+    });
+
+    socket.on("voice-call:cancel", ({ to }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:cancelled");
+      }
+    });
+
+    socket.on("voice-call:end", ({ to }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:end");
+      }
+    });
+
+    socket.on("voice-call:offer", ({ to, offer }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:offer", { offer });
+      }
+    });
+
+    socket.on("voice-call:answer", ({ to, answer }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:answer", { answer });
+      }
+    });
+
+    socket.on("voice-call:ice", ({ to, candidate }) => {
+      const targetSocketId = userSocketMap.get(String(to));
+
+      if (targetSocketId) {
+        io.to(targetSocketId).emit("voice-call:ice", { candidate });
+      }
+    });
+
     socket.on("disconnect", () => {
       for (const [userId, socketId] of userSocketMap.entries()) {
         if (socketId === socket.id) {

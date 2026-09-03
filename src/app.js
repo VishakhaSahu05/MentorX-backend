@@ -1,5 +1,12 @@
 require("dotenv").config();
 
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err);
+});
+
 const { RtcTokenBuilder, RtcRole } = require("agora-token");
 const express = require("express");
 const connectDB = require("./config/database");

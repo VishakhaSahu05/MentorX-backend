@@ -14,11 +14,15 @@ const convertToMp4 = (inputPath) => {
     ffmpeg(inputPath)
       .videoCodec("libx264")
       .audioCodec("aac")
-      .outputOptions("-movflags faststart")
+      .outputOptions([
+        "-movflags faststart",
+        "-preset veryfast",
+        "-threads 1",
+      ])
       .format("mp4")
       .save(outputPath)
       .on("end", () => resolve(outputPath))
-      .on("error", reject);
+      .on("error", (err) => reject(err));
   });
 };
 
