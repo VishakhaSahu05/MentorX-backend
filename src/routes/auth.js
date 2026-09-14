@@ -28,6 +28,7 @@ authRouter.post("/signup", async (req, res) => {
       httpOnly: true,
       sameSite: "none",
       secure: true,
+      path: "/",
     });
 
     res.status(201).json({
@@ -61,6 +62,7 @@ authRouter.post("/login", async (req, res) => {
       httpOnly: true,
       sameSite: "none",
       secure: true,
+      path: "/",
     });
 
     res.json(user);
@@ -72,8 +74,8 @@ authRouter.post("/login", async (req, res) => {
 authRouter.post("/logout", async (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    sameSite: "lax",
-    secure: false, // prod me true
+    sameSite: "none",
+    secure: true,
     path: "/",
   });
   res.send("Logout Successful!");
