@@ -58,8 +58,27 @@ const eventRouter = require("./routes/eventRouter");
 const chatRouter = require("./routes/chat");
 const voiceRouter = require("./routes/voice");
 const aiSummaryRoutes = require("./routes/aiSummaryRoutes");
-app.get("/api/agora-token", (req, res) => {
+const recordingRouter = require("./routes/recording");
+const { userAuth } = require("./middleware/auth");
+
+app.get("/api/agora-token", userAuth, (req, res) => {
   const { channelName, uid } = req.query;
+
+  if (!channelName) {
+    return res.status(400).json({ error: "channelName is required" });
+  }
+
+  // Channel names are built as the two participants' ids, sorted and joined by
+  // "_" (see VideoCall.jsx and getCallRoomId in utils/socket.js). Require the
+  // requester to be one of those ids so a token cannot be minted for a call the
+  // caller is not part of. Screen-share/recorder uids reuse the same channel.
+  const parts = String(channelName).split("_");
+  if (!parts.includes(String(req.user._id))) {
+    return res
+      .status(403)
+      .json({ error: "You are not a participant of this channel" });
+  }
+
   const expirationTimeInSeconds = 3600;
   const currentTimestamp = Math.floor(Date.now() / 1000);
   const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
@@ -68,7 +87,7 @@ app.get("/api/agora-token", (req, res) => {
     process.env.AGORA_APP_ID,
     process.env.AGORA_APP_CERTIFICATE,
     channelName,
-    uid || 0,
+    Number(uid) || 0,
     RtcRole.PUBLISHER,
     privilegeExpiredTs,
     privilegeExpiredTs,
@@ -90,6 +109,7 @@ app.use("/", dashboardRouter);
 app.use("/", eventRouter);
 app.use("/", chatRouter);
 app.use("/", voiceRouter);
+app.use("/", recordingRouter);
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api/ai-summary", aiSummaryRoutes);
 
@@ -97,15 +117,23 @@ app.use("/api/ai-summary", aiSummaryRoutes);
 const server = http.createServer(app);
 
 // SOCKET INIT
-initializeSocket(server);
+// Expose the io instance and a per-user emitter so REST controllers (recording
+// consent/state changes) can push events to both call participants.
+const { io, emitToUser } = initializeSocket(server);
+app.set("io", io);
+app.set("emitToUser", emitToUser);
 
 // DB + SERVER START
+// Hosts like Render assign the port via PORT and health-check it, so honour it
+// when present. Falls back to 3000 so local development is unchanged.
+const PORT = process.env.PORT || 3000;
+
 connectDB()
   .then(() => {
     console.log("Database connection established...");
 
-    server.listen(3000, () => {
-      console.log("Server is Successfully listening on port 3000");
+    server.listen(PORT, () => {
+      console.log(`Server is Successfully listening on port ${PORT}`);
     });
   })
   .catch((err) => {
