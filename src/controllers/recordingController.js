@@ -206,7 +206,6 @@ const respondToConsent = async (req, res) => {
       const resourceId = await agora.acquire({
         channelName: recording.channelName,
         recorderUid,
-        fileNamePrefix,
       });
 
       const sid = await agora.start({
@@ -292,14 +291,22 @@ const finalizeRecording = async (recording, { emitToUser, reason } = {}) => {
       sid: claimed.sid,
     });
   } catch (err) {
-    // Agora returns 404 once the recorder has already left (e.g. maxIdleTime
-    // elapsed because everyone hung up). That is a normal finish, not a failure.
-    const alreadyGone = err?.status === 404;
+    // Agora reports "already gone" in a few ways once the recorder has left the
+    // channel on its own (maxIdleTime elapsed because everyone hung up, or the
+    // resource expired). None of those mean the recording failed, so treat them
+    // as a normal finish and fall through to collecting the files.
+    const reason = err?.body?.reason || "";
+    const alreadyGone =
+      err?.status === 404 ||
+      err?.body?.code === 2 ||
+      /not.*exist|no.*such|already.*stop|expire/i.test(reason);
+
     if (!alreadyGone) {
-      console.error("[recording] Agora stop failed:", err.message, err.body || "");
+      const detail = err?.message || String(err);
+      console.error("[recording] Agora stop failed:", detail, err?.body || "");
       const failed = await releaseActiveLock(claimed._id, {
         status: "failed",
-        failureReason: err.message?.slice(0, 500),
+        failureReason: String(detail).slice(0, 500),
       });
       notifyBoth("recording:failed", {
         recordingId: String(claimed._id),

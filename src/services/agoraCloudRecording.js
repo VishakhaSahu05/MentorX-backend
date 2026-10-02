@@ -207,9 +207,14 @@ const buildRecordingConfig = (channelName, recorderToken) => ({
  * The returned resourceId is only valid for ~5 minutes, so start() must follow
  * promptly. We therefore never cache it.
  */
-const acquire = async ({ channelName, recorderUid, fileNamePrefix }) => {
-  const recorderToken = buildRecorderToken(channelName, recorderUid);
-
+const acquire = async ({ channelName, recorderUid }) => {
+  // startParameter is deliberately NOT sent here.
+  //
+  // When acquire carries a startParameter, Agora hashes it and requires the
+  // subsequent start request to hash identically. Our payload embeds a freshly
+  // minted RTC token (and the token encodes a timestamp), so the two requests
+  // could never hash the same and start failed with "request_hash mismatch!".
+  // Omitting it is supported and lets start define the configuration.
   const data = await agoraFetch(
     "/acquire",
     {
@@ -218,10 +223,6 @@ const acquire = async ({ channelName, recorderUid, fileNamePrefix }) => {
       clientRequest: {
         scene: 0, // real-time recording
         resourceExpiredHour: 24,
-        startParameter: {
-          ...buildRecordingConfig(channelName, recorderToken),
-          storageConfig: buildStorageConfig(fileNamePrefix),
-        },
       },
     },
     "acquire",
