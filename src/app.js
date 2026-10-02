@@ -124,12 +124,16 @@ app.set("io", io);
 app.set("emitToUser", emitToUser);
 
 // DB + SERVER START
+// Hosts like Render assign the port via PORT and health-check it, so honour it
+// when present. Falls back to 3000 so local development is unchanged.
+const PORT = process.env.PORT || 3000;
+
 connectDB()
   .then(() => {
     console.log("Database connection established...");
 
-    server.listen(3000, () => {
-      console.log("Server is Successfully listening on port 3000");
+    server.listen(PORT, () => {
+      console.log(`Server is Successfully listening on port ${PORT}`);
     });
   })
   .catch((err) => {
