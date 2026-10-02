@@ -486,10 +486,29 @@ const getActiveRecording = async (req, res) => {
     const recording = await CallRecording.findOne({
       channelName,
       activeLock: { $exists: true },
-    });
+    }).populate("initiator", "firstName lastName profilePic");
+
+    if (!recording) {
+      return res.json({ recording: null });
+    }
+
+    // Include who asked, so a client that mounted after the consent-request
+    // socket event was emitted can still render the consent prompt properly.
+    const initiatorUser = recording.initiator?._id
+      ? {
+          _id: String(recording.initiator._id),
+          firstName: recording.initiator.firstName,
+          lastName: recording.initiator.lastName,
+          profilePic: recording.initiator.profilePic,
+        }
+      : null;
 
     return res.json({
-      recording: recording ? toPublicJSON(recording) : null,
+      recording: {
+        ...toPublicJSON(recording),
+        initiator: initiatorUser ? initiatorUser._id : recording.initiator,
+        initiatorUser,
+      },
     });
   } catch (err) {
     console.error("[recording] active lookup error:", err);
