@@ -48,6 +48,41 @@ const initializeSocket = (server) => {
   const userSocketMap = new Map();
   const userDetailsMap = new Map();
 
+  // Send an event to a specific user, wherever their socket currently is.
+  // Exposed to the REST layer (app.set("emitToUser", ...)) so recording
+  // controllers can push consent/state changes to both participants.
+  const emitToUser = (userId, event, payload) => {
+    const socketId = userSocketMap.get(String(userId));
+    if (socketId) io.to(socketId).emit(event, payload);
+  };
+
+  // Lazily required: the controller pulls in the Agora service and models, and
+  // requiring it at module load would create a cycle through app.js.
+  const finalizeRecordingsFor = async (userId, reason) => {
+    try {
+      const {
+        finalizeActiveForChannel,
+      } = require("../controllers/recordingController");
+      const CallRecording = require("../models/callRecording");
+
+      // Any recording still marked `recording` that this user took part in
+      // must not be left orphaned when they vanish.
+      const active = await CallRecording.find({
+        participants: userId,
+        status: "recording",
+      }).select("channelName");
+
+      for (const rec of active) {
+        await finalizeActiveForChannel(rec.channelName, {
+          emitToUser,
+          reason,
+        });
+      }
+    } catch (err) {
+      console.error("[socket] failed to finalize recordings:", err.message);
+    }
+  };
+
   io.on("connection", (socket) => {
     console.log("User Connected:", socket.id);
 
@@ -188,6 +223,23 @@ const initializeSocket = (server) => {
     socket.on("video-call:end", ({ to }) => {
       const targetSocketId = userSocketMap.get(String(to));
       if (targetSocketId) io.to(targetSocketId).emit("video-call:end");
+
+      // The call is over: stop and finalize any recording for this pair so the
+      // file is uploaded and emailed even if nobody pressed "Stop Recording".
+      const enderUserId = [...userSocketMap.entries()].find(
+        ([_, sid]) => sid === socket.id,
+      )?.[0];
+      if (enderUserId) {
+        const channelName = getCallRoomId(enderUserId, to);
+        require("../controllers/recordingController")
+          .finalizeActiveForChannel(channelName, {
+            emitToUser,
+            reason: "call ended",
+          })
+          .catch((err) =>
+            console.error("[socket] finalize on call end failed:", err.message),
+          );
+      }
     });
 
     socket.on("video-call:offer", ({ to, offer }) => {
@@ -326,8 +378,10 @@ const initializeSocket = (server) => {
     });
 
     socket.on("disconnect", () => {
+      let disconnectedUserId = null;
       for (const [userId, socketId] of userSocketMap.entries()) {
         if (socketId === socket.id) {
+          disconnectedUserId = userId;
           userSocketMap.delete(userId);
           userDetailsMap.delete(userId);
           console.log(`User disconnected: ${userId}`);
@@ -335,8 +389,17 @@ const initializeSocket = (server) => {
         }
       }
       console.log("Socket disconnected:", socket.id);
+
+      // If the person who dropped had a recording running (e.g. the initiator
+      // closed their laptop), finalize it rather than leaving it orphaned.
+      // Agora's maxIdleTime is a backstop, but we want the DB in sync now.
+      if (disconnectedUserId) {
+        finalizeRecordingsFor(disconnectedUserId, "participant disconnected");
+      }
     });
   });
+
+  return { io, emitToUser };
 };
 
 module.exports = initializeSocket;
