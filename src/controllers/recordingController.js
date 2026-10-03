@@ -365,10 +365,17 @@ const finalizeRecording = async (recording, { emitToUser, reason } = {}) => {
 
   notifyBoth("recording:ready", { recordingId: String(ready._id) });
 
-  // Email both participants automatically, best-effort.
-  deliverRecordingEmails(ready._id).catch((err) =>
-    console.error("[recording] email dispatch failed:", err.message),
-  );
+  // Email both participants automatically.
+  //
+  // Awaited rather than fired-and-forgotten: the host can idle the process as
+  // soon as the HTTP response is sent, which would kill a detached promise and
+  // leave the recording ready but never emailed. Failures are swallowed inside
+  // deliverRecordingEmails, so this cannot break stopping a recording.
+  try {
+    await deliverRecordingEmails(ready._id);
+  } catch (err) {
+    console.error("[recording] email dispatch failed:", err?.message || err);
+  }
 
   return ready;
 };
@@ -547,6 +554,22 @@ const getRecording = async (req, res) => {
       recording = await tryResolveProcessing(recording, req.app.get("emitToUser"));
     }
 
+    // Safety net: a recording can be ready yet unemailed if delivery failed
+    // (e.g. a transient SMTP/network error). Retry on status checks so the
+    // link still reaches both participants.
+    if (
+      recording.status === "ready" &&
+      recording.s3Key &&
+      !recording.emailedTo?.length
+    ) {
+      try {
+        await deliverRecordingEmails(recording._id);
+        recording = await CallRecording.findById(recording._id);
+      } catch (err) {
+        console.error("[recording] retry email failed:", err?.message || err);
+      }
+    }
+
     return res.json({ recording: toPublicJSON(recording) });
   } catch (err) {
     console.error("[recording] get error:", err);
@@ -576,9 +599,11 @@ const tryResolveProcessing = async (recording, emitToUser) => {
       emitToUser?.(p, "recording:ready", { recordingId: String(ready._id) }),
     );
 
-    deliverRecordingEmails(ready._id).catch((err) =>
-      console.error("[recording] email dispatch failed:", err.message),
-    );
+    try {
+      await deliverRecordingEmails(ready._id);
+    } catch (err) {
+      console.error("[recording] email dispatch failed:", err?.message || err);
+    }
 
     return ready;
   } catch (err) {

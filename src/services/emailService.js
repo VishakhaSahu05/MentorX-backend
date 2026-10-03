@@ -31,6 +31,13 @@ const getTransporter = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // Force IPv4. The host resolves smtp.gmail.com to an IPv6 address it
+    // cannot actually route, so delivery failed with
+    // "connect ENETUNREACH 2607:f8b0:...:587" on every send.
+    family: 4,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
 
   return cachedTransporter;
