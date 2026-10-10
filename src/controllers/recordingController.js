@@ -72,6 +72,53 @@ const releaseActiveLock = async (recordingId, update) =>
 const isParticipant = (rec, userId) =>
   rec.participants.some((p) => String(p) === String(userId));
 
+// How long a consent request may stay unanswered. Past this it is treated as
+// abandoned (e.g. the call ended while the server was restarting) so it cannot
+// hold the channel's active slot and resurface on the next call.
+const PENDING_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * Withdraw an unanswered consent request and tell both participants.
+ * Conditional on status so it cannot clobber a request that was accepted in
+ * the meantime. Returns the updated document, or null if it was not pending.
+ */
+const cancelPending = async (recordingId, { emitToUser, reason } = {}) => {
+  const cancelled = await CallRecording.findOneAndUpdate(
+    { _id: recordingId, status: "pending" },
+    {
+      status: "declined",
+      failureReason: reason,
+      $unset: { activeLock: "" },
+    },
+    { new: true },
+  );
+  if (cancelled) {
+    cancelled.participants.forEach((p) =>
+      emitToUser?.(p, "recording:declined", {
+        recordingId: String(cancelled._id),
+        reason,
+      }),
+    );
+  }
+  return cancelled;
+};
+
+/** Cancel a consent request on this channel that has outlived PENDING_TTL_MS. */
+const expireStalePending = async (channelName, emitToUser) => {
+  const stale = await CallRecording.findOne({
+    channelName,
+    status: "pending",
+    activeLock: { $exists: true },
+    createdAt: { $lt: new Date(Date.now() - PENDING_TTL_MS) },
+  }).select("_id");
+  if (stale) {
+    await cancelPending(stale._id, {
+      emitToUser,
+      reason: "Consent request expired",
+    });
+  }
+};
+
 /* ------------------------------------------------------------------ *
  * POST /recording/request
  * Participant presses Record. Creates the pending session (losing the
@@ -95,6 +142,7 @@ const requestRecording = async (req, res) => {
     }
 
     const channelName = buildChannelName(req.user._id, targetUserId);
+    await expireStalePending(channelName, req.app.get("emitToUser"));
 
     let recording;
     try {
@@ -497,6 +545,8 @@ const getActiveRecording = async (req, res) => {
     }
 
     const channelName = buildChannelName(req.user._id, targetUserId);
+    await expireStalePending(channelName, req.app.get("emitToUser"));
+
     const recording = await CallRecording.findOne({
       channelName,
       activeLock: { $exists: true },
@@ -692,14 +742,21 @@ const getDownloadUrl = async (req, res) => {
 
 /* ------------------------------------------------------------------ *
  * Called from socket disconnect / call-end so a recording started by a
- * participant who vanished still gets finalized.
+ * participant who vanished still gets finalized, and a consent request
+ * nobody answered does not outlive the call.
  * ------------------------------------------------------------------ */
 const finalizeActiveForChannel = async (channelName, { emitToUser, reason }) => {
   const active = await CallRecording.findOne({
     channelName,
-    status: "recording",
+    status: { $in: ["pending", "recording"] },
   });
   if (!active) return null;
+  if (active.status === "pending") {
+    return cancelPending(active._id, {
+      emitToUser,
+      reason: `Cancelled before consent (${reason})`,
+    });
+  }
   return finalizeRecording(active, { emitToUser, reason });
 };
 

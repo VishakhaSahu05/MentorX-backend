@@ -66,10 +66,11 @@ const initializeSocket = (server) => {
       const CallRecording = require("../models/callRecording");
 
       // Any recording still marked `recording` that this user took part in
-      // must not be left orphaned when they vanish.
+      // must not be left orphaned when they vanish, and an unanswered consent
+      // request must not survive into their next call.
       const active = await CallRecording.find({
         participants: userId,
-        status: "recording",
+        status: { $in: ["pending", "recording"] },
       }).select("channelName");
 
       for (const rec of active) {
@@ -81,6 +82,24 @@ const initializeSocket = (server) => {
     } catch (err) {
       console.error("[socket] failed to finalize recordings:", err.message);
     }
+  };
+
+  // The call between this socket's user and `to` is over: stop and finalize
+  // any recording for the pair (so the file is uploaded and emailed even if
+  // nobody pressed "Stop Recording"), or withdraw an unanswered consent request.
+  const finalizeCallRecording = (socket, to, reason) => {
+    const userId = [...userSocketMap.entries()].find(
+      ([_, sid]) => sid === socket.id,
+    )?.[0];
+    if (!userId) return;
+    require("../controllers/recordingController")
+      .finalizeActiveForChannel(getCallRoomId(userId, to), {
+        emitToUser,
+        reason,
+      })
+      .catch((err) =>
+        console.error(`[socket] finalize on ${reason} failed:`, err.message),
+      );
   };
 
   io.on("connection", (socket) => {
@@ -213,33 +232,20 @@ const initializeSocket = (server) => {
     socket.on("video-call:rejected", ({ to }) => {
       const targetSocketId = userSocketMap.get(String(to));
       if (targetSocketId) io.to(targetSocketId).emit("video-call:rejected");
+      // The caller can press Record while still ringing.
+      finalizeCallRecording(socket, to, "call rejected");
     });
 
     socket.on("video-call:cancel", ({ to }) => {
       const targetSocketId = userSocketMap.get(String(to));
       if (targetSocketId) io.to(targetSocketId).emit("video-call:cancelled");
+      finalizeCallRecording(socket, to, "call cancelled");
     });
 
     socket.on("video-call:end", ({ to }) => {
       const targetSocketId = userSocketMap.get(String(to));
       if (targetSocketId) io.to(targetSocketId).emit("video-call:end");
-
-      // The call is over: stop and finalize any recording for this pair so the
-      // file is uploaded and emailed even if nobody pressed "Stop Recording".
-      const enderUserId = [...userSocketMap.entries()].find(
-        ([_, sid]) => sid === socket.id,
-      )?.[0];
-      if (enderUserId) {
-        const channelName = getCallRoomId(enderUserId, to);
-        require("../controllers/recordingController")
-          .finalizeActiveForChannel(channelName, {
-            emitToUser,
-            reason: "call ended",
-          })
-          .catch((err) =>
-            console.error("[socket] finalize on call end failed:", err.message),
-          );
-      }
+      finalizeCallRecording(socket, to, "call ended");
     });
 
     socket.on("video-call:offer", ({ to, offer }) => {
