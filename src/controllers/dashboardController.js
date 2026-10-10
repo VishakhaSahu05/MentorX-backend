@@ -52,4 +52,49 @@ const getDashboard = async (req, res) => {
   }
 };
 
-module.exports = { getDashboard };
+const FEATURED_LIMIT = 6;
+const DEFAULT_PROFILE_PIC = User.schema.path("profilePic").defaultValue;
+
+/**
+ * Public list of mentors for the landing page. Only fields a visitor may see:
+ * no email, age, gender or anything private. Mentors with fuller profiles
+ * (own photo, skills, about) are shown first.
+ */
+const getFeaturedMentors = async (req, res) => {
+  try {
+    const mentors = await User.find({ role: "mentor" })
+      .select("firstName lastName profilePic department skills about")
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    const completeness = (m) =>
+      (m.profilePic && m.profilePic !== DEFAULT_PROFILE_PIC ? 2 : 0) +
+      (m.skills?.length ? 1 : 0) +
+      (m.about ? 1 : 0);
+
+    const featured = mentors
+      .map((m, i) => ({ m, i, score: completeness(m) }))
+      .sort((a, b) => b.score - a.score || a.i - b.i)
+      .slice(0, FEATURED_LIMIT)
+      .map(({ m }) => ({
+        _id: m._id,
+        firstName: m.firstName?.trim(),
+        lastName: m.lastName?.trim(),
+        profilePic:
+          m.profilePic && m.profilePic !== DEFAULT_PROFILE_PIC
+            ? m.profilePic
+            : null,
+        department: m.department,
+        skills: (m.skills || []).slice(0, 4),
+        about: m.about ? m.about.slice(0, 140) : "",
+      }));
+
+    return res.json({ mentors: featured });
+  } catch (err) {
+    console.error("FEATURED MENTORS ERROR ", err);
+    return res.status(500).json({ error: "Failed to load mentors" });
+  }
+};
+
+module.exports = { getDashboard, getFeaturedMentors };
